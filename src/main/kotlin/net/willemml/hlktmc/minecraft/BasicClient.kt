@@ -10,6 +10,7 @@ import com.github.steveice10.mc.protocol.packet.ingame.client.ClientChatPacket
 import com.github.steveice10.mc.protocol.packet.ingame.client.ClientRequestPacket
 import com.github.steveice10.mc.protocol.packet.ingame.client.ClientSettingsPacket
 import com.github.steveice10.mc.protocol.packet.ingame.client.world.ClientTeleportConfirmPacket
+import com.github.steveice10.mc.protocol.packet.ingame.clientbound.ClientboundLoginPacket
 import com.github.steveice10.mc.protocol.packet.ingame.server.ServerChatPacket
 import com.github.steveice10.mc.protocol.packet.ingame.server.ServerJoinGamePacket
 import com.github.steveice10.mc.protocol.packet.ingame.server.ServerPlayerListDataPacket
@@ -23,6 +24,7 @@ import com.github.steveice10.mc.protocol.packet.ingame.server.entity.player.Serv
 import com.github.steveice10.mc.protocol.packet.ingame.server.world.ServerChunkDataPacket
 import com.github.steveice10.mc.protocol.packet.ingame.server.world.ServerSpawnPositionPacket
 import com.github.steveice10.mc.protocol.packet.ingame.server.world.ServerUpdateViewPositionPacket
+import com.github.steveice10.mc.protocol.packet.ingame.serverbound.ServerboundChatPacket
 import com.github.steveice10.mc.protocol.packet.login.server.LoginSuccessPacket
 import com.github.steveice10.packetlib.Client
 import com.github.steveice10.packetlib.event.session.ConnectedEvent
@@ -37,13 +39,14 @@ import net.daporkchop.lib.minecraft.text.parser.AutoMCFormatParser
 import net.daporkchop.lib.minecraft.text.util.TranslationSource
 import net.willemml.hlktmc.ClientConfig
 import net.willemml.hlktmc.minecraft.player.*
+import net.willemml.hlktmc.minecraft.session.ClientSessionAdapter
 import net.willemml.hlktmc.minecraft.world.WorldManager
 import net.willemml.hlktmc.minecraft.world.types.ChunkPos
 import java.util.*
 import kotlin.collections.HashMap
 
 open class BasicClient(val config: ClientConfig = ClientConfig()) {
-    private val protocol: MinecraftProtocol =
+    val protocol: MinecraftProtocol =
         if (config.password.isEmpty()) {
             println("No password")
             MinecraftProtocol(config.username)
@@ -52,13 +55,13 @@ open class BasicClient(val config: ClientConfig = ClientConfig()) {
             config.password
         )
 
-    private val client = Client(config.address, config.port, protocol, TcpSessionFactory())
+    val client = Client(config.address, config.port, protocol, TcpSessionFactory())
 
-    private var joined = false
+    var joined = false
 
     private val hostPort = "${config.address}:${config.port}"
 
-    private val parser = AutoMCFormatParser(
+    val parser = AutoMCFormatParser(
         TranslationSource.ofMap(
             hashMapOf(
                 Pair("chat.type.text", "<%s> %s"),
@@ -76,136 +79,7 @@ open class BasicClient(val config: ClientConfig = ClientConfig()) {
     var player = Player(protocol.profile.name, protocol.profile.id ?: UUID.randomUUID(), client, world)
 
     init {
-        client.session.addListener(object : SessionAdapter() {
-            override fun connected(event: ConnectedEvent?) {
-                if (config.logConnection) connectionLog("", ConnectionLogType.CONNECTED)
-            }
-
-            override fun packetReceived(event: PacketReceivedEvent?) {
-                when (event?.getPacket<Packet>()) {
-                    is ServerJoinGamePacket -> {
-                        val packet = event.getPacket<ServerJoinGamePacket>()
-                        player.entityID = packet.entityId
-                        player.gameMode = packet.gameMode
-                        sendClientSettings()
-                        joined = true
-                        player.positioning.onJoin()
-                        onJoin(packet)
-                    }
-                    is LoginSuccessPacket -> {
-                        val packet = event.getPacket<LoginSuccessPacket>()
-                        player = Player(packet.profile.name, packet.profile.id, client, world)
-                    }
-                    is ServerSpawnPositionPacket -> {
-                        val position = event.getPacket<ServerSpawnPositionPacket>().position
-                        player.spawnPoint =
-                            Position(position.x.toDouble(), position.y.toDouble(), position.z.toDouble())
-                    }
-                    is ServerPlayerPositionRotationPacket -> {
-                        val packet = event.getPacket<ServerPlayerPositionRotationPacket>()
-                        val deltaX = if (packet.relative.contains(PositionElement.X)) packet.x
-                        else packet.x - player.positioning.position.x
-                        val deltaY = if (packet.relative.contains(PositionElement.Y)) packet.y
-                        else packet.y - player.positioning.position.y
-                        val deltaZ = if (packet.relative.contains(PositionElement.Z)) packet.z
-                        else packet.z - player.positioning.position.z
-                        val deltaYaw = if (packet.relative.contains(PositionElement.YAW)) packet.yaw
-                        else packet.yaw - player.positioning.rotation.yaw
-                        val deltaPitch = if (packet.relative.contains(PositionElement.PITCH)) packet.pitch
-                        else packet.pitch - player.positioning.rotation.pitch
-                        player.positioning.position =
-                            player.positioning.position.addDelta(PositionDelta(deltaX, deltaY, deltaZ))
-                        player.positioning.rotation =
-                            player.positioning.rotation.addDelta(RotationDelta(deltaYaw, deltaPitch))
-                        client.session.send(ClientTeleportConfirmPacket(packet.teleportId))
-                    }
-                    is ServerPlayerHealthPacket -> {
-                        val packet = event.getPacket<ServerPlayerHealthPacket>()
-                        player.health.health = packet.health
-                        player.health.saturation = packet.saturation
-                        player.health.food = packet.food
-                        if (player.health.health <= 0) respawn()
-                    }
-                    is ServerUpdateViewPositionPacket -> {
-                        val packet = event.getPacket<ServerUpdateViewPositionPacket>()
-                        player.positioning.chunk = ChunkPos(packet.chunkX, packet.chunkZ)
-                        world.pruneColumns(player.positioning.chunk, config.chunkUnloadDistance)
-                    }
-                    is ServerChunkDataPacket -> {
-                        val packet = event.getPacket<ServerChunkDataPacket>()
-                        world.addColumn(packet.column, player.positioning.chunk, config.chunkUnloadDistance)
-                    }
-                    is ServerEntityTeleportPacket -> {
-                        val packet = event.getPacket<ServerEntityTeleportPacket>()
-                        if (packet.entityId == player.entityID) {
-                            player.positioning.position = Position(packet.x, packet.y, packet.z)
-                            player.positioning.rotation = Rotation(packet.yaw, packet.pitch)
-                        }
-                    }
-                    is ServerEntityPositionPacket -> {
-                        val packet = event.getPacket<ServerEntityPositionPacket>()
-                        if (packet.entityId == player.entityID) {
-                            player.positioning.position =
-                                player.positioning.position.addDelta(
-                                    PositionDelta(
-                                        packet.moveX / (128 * 32),
-                                        packet.moveX / (128 * 32),
-                                        packet.moveX / (128 * 32)
-                                    )
-                                )
-                        }
-                    }
-                    is ServerEntityRotationPacket -> {
-                        val packet = event.getPacket<ServerEntityRotationPacket>()
-                        if (packet.entityId == player.entityID) {
-                            player.positioning.rotation = Rotation(packet.yaw, packet.pitch)
-                        }
-                    }
-                    is ServerEntityPositionRotationPacket -> {
-                        val packet = event.getPacket<ServerEntityPositionRotationPacket>()
-                        if (packet.entityId == player.entityID) {
-                            player.positioning.position =
-                                player.positioning.position.addDelta(
-                                    PositionDelta(
-                                        packet.moveX / (128 * 32),
-                                        packet.moveX / (128 * 32),
-                                        packet.moveX / (128 * 32)
-                                    )
-                                )
-                            player.positioning.rotation = Rotation(packet.yaw, packet.pitch)
-                        }
-                    }
-                    is ServerChatPacket -> {
-                        val packet = event.getPacket<ServerChatPacket>()
-                        val message = parser.parse(MessageSerializer.toJsonString(packet.message))
-                        val messageString = message.toRawString()
-                        if (config.logChat) logChat(messageString, packet.type, packet.senderUuid, message)
-                        onChat(messageString, packet.type, packet.senderUuid, message)
-                    }
-                    is ServerPlayerListEntryPacket -> {
-                        val packet = event.getPacket<ServerPlayerListEntryPacket>()
-                        for (entry in packet.entries) {
-                            if (entry.profile.isComplete) playerListEntries[entry.profile.id] = entry.profile
-                        }
-                    }
-                    is ServerPlayerListDataPacket -> {
-                        val packet = event.getPacket<ServerPlayerListDataPacket>()
-                        playerListHeader = packet.header.toString()
-                        playerListFooter = packet.header.toString()
-                    }
-                }
-            }
-
-            override fun disconnected(event: DisconnectedEvent?) {
-                if (config.logConnection) connectionLog(event?.reason ?: "".let {
-                    parser.parse(it).toRawString()
-                }, ConnectionLogType.DISCONNECTED)
-                println("${protocol.profile}, ${protocol.profile.name}")
-                joined = false
-                player.positioning.stop = true
-                onLeave(event ?: return)
-            }
-        })
+        client.session.addListener(ClientSessionAdapter())
     }
 
     suspend fun connect(): BasicClient {
@@ -230,7 +104,12 @@ open class BasicClient(val config: ClientConfig = ClientConfig()) {
     }
 
     fun sendMessage(message: String): BasicClient {
-        client.session.send(ClientChatPacket(message))
+        // TODO: COme back to review this and what to send for salt, other stuff too!
+        client.session.send(ServerboundChatPacket(
+            message = message,
+            timeStamp = System.currentTimeMillis(),
+            )
+        )
         return this
     }
 
@@ -276,7 +155,7 @@ open class BasicClient(val config: ClientConfig = ClientConfig()) {
 
     }
 
-    open fun onJoin(packet: ServerJoinGamePacket) {}
+    open fun onJoin(packet: ClientboundLoginPacket) {}
     open fun onLeave(event: DisconnectedEvent) {}
     open fun onChat(message: String, messageType: MessageType, sender: UUID, rawMessage: MCTextRoot) {}
 }

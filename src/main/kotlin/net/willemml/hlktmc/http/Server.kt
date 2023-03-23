@@ -1,3 +1,5 @@
+package net.willemml.hlktmc.http
+
 import io.ktor.application.*
 import io.ktor.html.*
 import io.ktor.http.*

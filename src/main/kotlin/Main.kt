@@ -1,4 +1,5 @@
 import net.willemml.hlktmc.cli.CLI
+import net.willemml.hlktmc.http.server
 import net.willemml.hlktmc.minecraft.bot.ChatBotManager
 import net.willemml.hlktmc.minecraft.ResourceManager
 import java.io.IOException
