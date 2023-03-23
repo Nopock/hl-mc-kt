@@ -2,35 +2,12 @@ package net.willemml.hlktmc.minecraft
 
 import com.github.steveice10.mc.auth.data.GameProfile
 import com.github.steveice10.mc.protocol.MinecraftProtocol
-import com.github.steveice10.mc.protocol.data.game.ClientRequest
-import com.github.steveice10.mc.protocol.data.game.MessageType
-import com.github.steveice10.mc.protocol.data.game.entity.player.PositionElement
-import com.github.steveice10.mc.protocol.data.message.MessageSerializer
-import com.github.steveice10.mc.protocol.packet.ingame.client.ClientChatPacket
-import com.github.steveice10.mc.protocol.packet.ingame.client.ClientRequestPacket
-import com.github.steveice10.mc.protocol.packet.ingame.client.ClientSettingsPacket
-import com.github.steveice10.mc.protocol.packet.ingame.client.world.ClientTeleportConfirmPacket
-import com.github.steveice10.mc.protocol.packet.ingame.clientbound.ClientboundLoginPacket
-import com.github.steveice10.mc.protocol.packet.ingame.server.ServerChatPacket
-import com.github.steveice10.mc.protocol.packet.ingame.server.ServerJoinGamePacket
-import com.github.steveice10.mc.protocol.packet.ingame.server.ServerPlayerListDataPacket
-import com.github.steveice10.mc.protocol.packet.ingame.server.ServerPlayerListEntryPacket
-import com.github.steveice10.mc.protocol.packet.ingame.server.entity.ServerEntityPositionPacket
-import com.github.steveice10.mc.protocol.packet.ingame.server.entity.ServerEntityPositionRotationPacket
-import com.github.steveice10.mc.protocol.packet.ingame.server.entity.ServerEntityRotationPacket
-import com.github.steveice10.mc.protocol.packet.ingame.server.entity.ServerEntityTeleportPacket
-import com.github.steveice10.mc.protocol.packet.ingame.server.entity.player.ServerPlayerHealthPacket
-import com.github.steveice10.mc.protocol.packet.ingame.server.entity.player.ServerPlayerPositionRotationPacket
-import com.github.steveice10.mc.protocol.packet.ingame.server.world.ServerChunkDataPacket
-import com.github.steveice10.mc.protocol.packet.ingame.server.world.ServerSpawnPositionPacket
-import com.github.steveice10.mc.protocol.packet.ingame.server.world.ServerUpdateViewPositionPacket
+import com.github.steveice10.mc.protocol.data.game.ClientCommand
 import com.github.steveice10.mc.protocol.packet.ingame.serverbound.ServerboundChatPacket
-import com.github.steveice10.mc.protocol.packet.login.server.LoginSuccessPacket
+import com.github.steveice10.mc.protocol.packet.ingame.serverbound.ServerboundClientCommandPacket
 import com.github.steveice10.packetlib.Client
 import com.github.steveice10.packetlib.event.session.ConnectedEvent
 import com.github.steveice10.packetlib.event.session.DisconnectedEvent
-import com.github.steveice10.packetlib.event.session.PacketReceivedEvent
-import com.github.steveice10.packetlib.event.session.SessionAdapter
 import com.github.steveice10.packetlib.packet.Packet
 import com.github.steveice10.packetlib.tcp.TcpSessionFactory
 import kotlinx.coroutines.delay
@@ -79,7 +56,7 @@ open class BasicClient(val config: ClientConfig = ClientConfig()) {
     var player = Player(protocol.profile.name, protocol.profile.id ?: UUID.randomUUID(), client, world)
 
     init {
-        client.session.addListener(ClientSessionAdapter())
+        client.session.addListener(ClientSessionAdapter(config, this))
     }
 
     suspend fun connect(): BasicClient {
@@ -98,7 +75,7 @@ open class BasicClient(val config: ClientConfig = ClientConfig()) {
     }
 
     fun respawn(): BasicClient {
-        client.session.send(ClientRequestPacket(ClientRequest.RESPAWN))
+        client.session.send(ServerboundClientCommandPacket(ClientCommand.RESPAWN))
         if (config.logRespawns && joined) connectionLog("", ConnectionLogType.RESPAWN)
         return this
     }
@@ -137,7 +114,7 @@ open class BasicClient(val config: ClientConfig = ClientConfig()) {
 
     fun getNameFromID(id: UUID) = playerListEntries[id]?.name
 
-    open fun logChat(message: String, messageType: MessageType, sender: UUID, rawMessage: MCTextRoot) {
+    open fun logChat(message: String, messageType: Int, sender: UUID, rawMessage: MCTextRoot) {
         println("${getNameFromID(sender) ?: sender}@$hostPort ($messageType): $message")
     }
 
@@ -157,7 +134,7 @@ open class BasicClient(val config: ClientConfig = ClientConfig()) {
 
     open fun onJoin(packet: ClientboundLoginPacket) {}
     open fun onLeave(event: DisconnectedEvent) {}
-    open fun onChat(message: String, messageType: MessageType, sender: UUID, rawMessage: MCTextRoot) {}
+    open fun onChat(message: String, sender: UUID, rawMessage: MCTextRoot) {}
 }
 
 enum class ConnectionLogType {

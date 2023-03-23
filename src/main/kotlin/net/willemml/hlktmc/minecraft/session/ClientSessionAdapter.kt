@@ -2,8 +2,21 @@ package net.willemml.hlktmc.minecraft.session
 
 import com.github.steveice10.mc.protocol.data.game.entity.player.PositionElement
 import com.github.steveice10.mc.protocol.packet.ingame.clientbound.ClientboundLoginPacket
+import com.github.steveice10.mc.protocol.packet.ingame.clientbound.ClientboundPlayerChatHeaderPacket
+import com.github.steveice10.mc.protocol.packet.ingame.clientbound.ClientboundPlayerChatPacket
+import com.github.steveice10.mc.protocol.packet.ingame.clientbound.ClientboundPlayerInfoPacket
+import com.github.steveice10.mc.protocol.packet.ingame.clientbound.ClientboundTabListPacket
+import com.github.steveice10.mc.protocol.packet.ingame.clientbound.entity.ClientboundMoveEntityPosPacket
+import com.github.steveice10.mc.protocol.packet.ingame.clientbound.entity.ClientboundMoveEntityPosRotPacket
+import com.github.steveice10.mc.protocol.packet.ingame.clientbound.entity.ClientboundMoveEntityRotPacket
+import com.github.steveice10.mc.protocol.packet.ingame.clientbound.entity.ClientboundTeleportEntityPacket
 import com.github.steveice10.mc.protocol.packet.ingame.clientbound.entity.player.ClientboundPlayerPositionPacket
+import com.github.steveice10.mc.protocol.packet.ingame.clientbound.entity.player.ClientboundSetHealthPacket
+import com.github.steveice10.mc.protocol.packet.ingame.clientbound.level.ClientboundLevelChunkWithLightPacket
+import com.github.steveice10.mc.protocol.packet.ingame.clientbound.level.ClientboundSetChunkCacheCenterPacket
+import com.github.steveice10.mc.protocol.packet.ingame.clientbound.level.ClientboundSetDefaultSpawnPositionPacket
 import com.github.steveice10.mc.protocol.packet.ingame.serverbound.level.ServerboundAcceptTeleportationPacket
+import com.github.steveice10.mc.protocol.packet.login.clientbound.ClientboundGameProfilePacket
 import com.github.steveice10.packetlib.Session
 import com.github.steveice10.packetlib.event.session.ConnectedEvent
 import com.github.steveice10.packetlib.event.session.DisconnectedEvent
@@ -31,10 +44,11 @@ class ClientSessionAdapter(val config: ClientConfig, val client: BasicClient) : 
                 client.player.positioning.onJoin()
                 client.onJoin(packet)
             }
-            is LoginSuccessPacket -> {
+            is ClientboundGameProfilePacket -> {
                 client.player = Player(packet.profile.name, packet.profile.id, client, client.world)
             }
-            is ServerSpawnPositionPacket -> {
+            is ClientboundSetDefaultSpawnPositionPacket -> {
+                // This used to be ServerSpawnPositionPacket
                 val position = packet.position
                 client.player.spawnPoint = Position(position.x.toDouble(), position.y.toDouble(), position.z.toDouble())
             }
@@ -54,29 +68,30 @@ class ClientSessionAdapter(val config: ClientConfig, val client: BasicClient) : 
                 client.player.positioning.rotation = client.player.positioning.rotation.addDelta(RotationDelta(deltaYaw, deltaPitch))
                 client.client.session.send(ServerboundAcceptTeleportationPacket(packet.teleportId))
             }
-            is ServerPlayerHealthPacket -> {
+            is ClientboundSetHealthPacket -> {
+                // This was ServerPlayerHealthPacket
                 client.player.health.health = packet.health
                 client.player.health.saturation = packet.saturation
                 client.player.health.food = packet.food
                 if (client.player.health.health <= 0) client.respawn()
             }
-            is ServerUpdateViewPositionPacket -> {
+            is ClientboundSetChunkCacheCenterPacket -> {
                 client.player.positioning.chunk = ChunkPos(packet.chunkX, packet.chunkZ)
                 client.world.pruneColumns(client.player.positioning.chunk, config.chunkUnloadDistance)
             }
-            is ServerChunkDataPacket -> {
+            is ClientboundLevelChunkWithLightPacket -> {
                 client.world.addColumn(packet.column, client.player.positioning.chunk, config.chunkUnloadDistance)
             }
-            is ServerEntityTeleportPacket -> {
+            is ClientboundTeleportEntityPacket -> {
                 if (packet.entityId == client.player.entityID) {
                     client.player.positioning.position = Position(packet.x, packet.y, packet.z)
                     client.player.positioning.rotation = Rotation(packet.yaw, packet.pitch)
                 }
             }
-            is ServerEntityPositionPacket -> {
+            is ClientboundMoveEntityPosPacket -> {
                 if (packet.entityId == client.player.entityID) {
                     client.player.positioning.position =
-                        pclient.layer.positioning.position.addDelta(
+                        client.player.positioning.position.addDelta(
                             PositionDelta(
                                 packet.moveX / (128 * 32),
                                 packet.moveX / (128 * 32),
@@ -85,13 +100,12 @@ class ClientSessionAdapter(val config: ClientConfig, val client: BasicClient) : 
                         )
                 }
             }
-            is ServerEntityRotationPacket -> {
+            is ClientboundMoveEntityRotPacket -> {
                 if (packet.entityId == client.player.entityID) {
                     client.player.positioning.rotation = Rotation(packet.yaw, packet.pitch)
                 }
             }
-            is ServerEntityPositionRotationPacket -> {
-                val packet = packet as ServerEntityRotationPacket
+            is ClientboundMoveEntityPosRotPacket -> {
                 if (packet.entityId == client.player.entityID) {
                     client.player.positioning.position =
                         client.player.positioning.position.addDelta(
@@ -104,18 +118,20 @@ class ClientSessionAdapter(val config: ClientConfig, val client: BasicClient) : 
                     client.player.positioning.rotation = Rotation(packet.yaw, packet.pitch)
                 }
             }
-            is ServerChatPacket -> {
-                val message = client.parser.parse(MessageSerializer.toJsonString(packet.message))
-                val messageString = message.toRawString()
-                if (config.logChat) client.logChat(messageString, packet.type, packet.senderUuid, message)
-                client.onChat(messageString, packet.type, packet.senderUuid, message)
+            //TODO: Investigate ClientboundPlayerChatHeaderPacket
+            is ClientboundPlayerChatPacket -> {
+                val parsed = client.parser.parse(packet.messagePlain)
+                val message = packet.messagePlain //TODO: Check if we need to do decorated or not D:
+                //val message = client.parser.parse(MessageSerializer.toJsonString(packet.message))
+                if (config.logChat) client.logChat(message, packet.chatType, packet.sender, parsed)
+                client.onChat(message, packet.sender, parsed)
             }
-            is ServerPlayerListEntryPacket -> {
+            is ClientboundPlayerInfoPacket -> {
                 for (entry in packet.entries) {
                     if (entry.profile.isComplete) client.playerListEntries[entry.profile.id] = entry.profile
                 }
             }
-            is ServerPlayerListDataPacket -> {
+            is ClientboundTabListPacket -> {
                 client.playerListHeader = packet.header.toString()
                 client.playerListFooter = packet.header.toString()
             }

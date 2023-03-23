@@ -1,6 +1,7 @@
 package net.willemml.hlktmc.minecraft.world
 
 import com.github.steveice10.mc.protocol.data.game.chunk.Column
+import com.github.steveice10.mc.protocol.data.game.chunk.ChunkSection
 import net.willemml.hlktmc.minecraft.AIR_BLOCK
 import net.willemml.hlktmc.minecraft.objects.BoundingBox
 import net.willemml.hlktmc.minecraft.ResourceManager
