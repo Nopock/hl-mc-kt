@@ -28,7 +28,7 @@ import net.willemml.hlktmc.minecraft.ConnectionLogType
 import net.willemml.hlktmc.minecraft.player.*
 import net.willemml.hlktmc.minecraft.world.types.ChunkPos
 
-class ClientSessionAdapter(val config: ClientConfig, val client: BasicClient) : SessionAdapter() {
+class ClientSessionAdapter(private val config: ClientConfig, val client: BasicClient) : SessionAdapter() {
 
     override fun connected(event: ConnectedEvent?) {
         if (config.logConnection) client.connectionLog("", ConnectionLogType.CONNECTED)

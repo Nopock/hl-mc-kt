@@ -5,10 +5,12 @@ import com.github.steveice10.mc.protocol.MinecraftProtocol
 import com.github.steveice10.mc.protocol.data.game.ClientCommand
 import com.github.steveice10.mc.protocol.packet.ingame.serverbound.ServerboundChatPacket
 import com.github.steveice10.mc.protocol.packet.ingame.serverbound.ServerboundClientCommandPacket
+import com.github.steveice10.packetlib.AbstractServer
 import com.github.steveice10.packetlib.Client
 import com.github.steveice10.packetlib.event.session.ConnectedEvent
 import com.github.steveice10.packetlib.event.session.DisconnectedEvent
 import com.github.steveice10.packetlib.packet.Packet
+import com.github.steveice10.packetlib.tcp.TcpClientSession
 import com.github.steveice10.packetlib.tcp.TcpSessionFactory
 import kotlinx.coroutines.delay
 import net.daporkchop.lib.minecraft.text.component.MCTextRoot
@@ -19,6 +21,7 @@ import net.willemml.hlktmc.minecraft.player.*
 import net.willemml.hlktmc.minecraft.session.ClientSessionAdapter
 import net.willemml.hlktmc.minecraft.world.WorldManager
 import net.willemml.hlktmc.minecraft.world.types.ChunkPos
+import java.net.Proxy
 import java.util.*
 import kotlin.collections.HashMap
 
@@ -33,6 +36,7 @@ open class BasicClient(val config: ClientConfig = ClientConfig()) {
         )
 
     val client = Client(config.address, config.port, protocol, TcpSessionFactory())
+    val test = TcpClientSession("127.0.0.1", 25565, Proxy.NO_PROXY)
 
     var joined = false
 
