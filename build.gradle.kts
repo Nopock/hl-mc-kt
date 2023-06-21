@@ -21,7 +21,7 @@ dependencies {
     implementation("org.slf4j:slf4j-nop:2.0.5")
     implementation("io.ktor:ktor-jackson:1.6.8")
     implementation("io.ktor:ktor-network:1.4.0")
-    implementation("io.ktor:ktor-server-jetty:1.4.0")
+    implementation("io.ktor:ktor-server-jetty:1.6.8")
     implementation("io.ktor:ktor-html-builder:1.6.8")
     implementation("io.ktor:ktor-client-apache:1.4.0")
     implementation("io.ktor:ktor-client-jackson:1.4.0")
