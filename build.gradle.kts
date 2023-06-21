@@ -24,7 +24,7 @@ dependencies {
     implementation("io.ktor:ktor-server-jetty:1.4.0")
     implementation("io.ktor:ktor-html-builder:1.6.8")
     implementation("io.ktor:ktor-client-apache:1.4.0")
-    implementation("io.ktor:ktor-client-jackson:1.4.0")
+    implementation("io.ktor:ktor-client-jackson:1.6.8")
     implementation("io.ktor:ktor-client-logging:1.4.0")
     implementation("org.jetbrains.kotlinx:kotlinx-html-jvm:0.8.0")
     implementation("com.github.Steveice10:MCProtocolLib:1.19.2-1")
