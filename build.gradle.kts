@@ -17,7 +17,7 @@ repositories {
     maven("https://repo.opencollab.dev/maven-releases/")
 }
 dependencies {
-    implementation("com.github.willemml:kt-cmd:v1.6.2")
+    implementation("com.github.willemml:kt-cmd:1.6.3")
     implementation("org.slf4j:slf4j-nop:2.0.5")
     implementation("io.ktor:ktor-jackson:1.6.8")
     implementation("io.ktor:ktor-network:1.4.0")
