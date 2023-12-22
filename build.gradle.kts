@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     kotlin("jvm") version "1.8.10"
     application
-    kotlin("plugin.serialization") version "1.4.10"
+    kotlin("plugin.serialization") version "1.9.22"
 }
 group = "net.willemml"
 version = "0.0.1"
