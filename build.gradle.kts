@@ -28,7 +28,7 @@ dependencies {
     implementation("io.ktor:ktor-client-logging:1.4.0")
     implementation("org.jetbrains.kotlinx:kotlinx-html-jvm:0.8.0")
     implementation("com.github.Steveice10:MCProtocolLib:1.19.2-1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.0-Beta")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("net.daporkchop.lib:minecraft-text:0.5.5-20201106.114836-37")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.5.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.0")
